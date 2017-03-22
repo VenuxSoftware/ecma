@@ -3,9 +3,11 @@
   Process: API generation
 */
 
-importScripts('speakGenerator.js');
+/*---
+description: Fails by calling $ERROR
+expected:
+  pass: false
+  message: failure message
+---*/
 
-onmessage = function(event) {
-  postMessage(generateSpeech(event.data.text, event.data.args));
-};
-
+$ERROR('failure message');

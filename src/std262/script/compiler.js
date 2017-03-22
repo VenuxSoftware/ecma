@@ -3,19 +3,28 @@
   Process: API generation
 */
 
-/*---
-description: Should not test in strict mode
-flags: [raw]
-expected:
-  pass: true
----*/
-var seemsStrict;
-try {
-  x = 1;
-} catch (err) {
-  seemsStrict = err.constructor === ReferenceError;
+'use strict';
+
+function jsonReporter(results) {
+  let started = false;
+
+  results.on('start', function () {
+    console.log('[');
+  });
+
+  results.on('end', function () { 
+    console.log(']');
+  });
+
+  results.on('test end', function (test) {
+    if (started) {
+      process.stdout.write(',');
+    } else {
+      started = true;
+    }
+
+    console.log(JSON.stringify(test));
+  });
 }
 
-if (seemsStrict) {
-  throw new Error('Script erroneously interpreted in strict mode.');
-}
+module.exports = jsonReporter;

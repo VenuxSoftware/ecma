@@ -3,127 +3,276 @@
   Process: API generation
 */
 
-// Copyright 2012 Mozilla Corporation. All rights reserved.
-// This code is governed by the BSD license found in the LICENSE file.
+// import
+var Layer   = require('./layer')
+,   Network = require('./network')
+,   Trainer = require('./trainer')
 
-/**
- * @description Tests that obj meets the requirements for built-in objects
- *     defined by the introduction of chapter 15 of the ECMAScript Language Specification.
- * @param {Object} obj the object to be tested.
- * @param {boolean} isFunction whether the specification describes obj as a function.
- * @param {boolean} isConstructor whether the specification describes obj as a constructor.
- * @param {String[]} properties an array with the names of the built-in properties of obj,
- *     excluding length, prototype, or properties with non-default attributes.
- * @param {number} length for functions only: the length specified for the function
- *     or derived from the argument list.
- * @author Norbert Lindenberg
- */
+/*******************************************************************************************
+                                        ARCHITECT
+*******************************************************************************************/
 
-function testBuiltInObject(obj, isFunction, isConstructor, properties, length) {
+// Colection of useful built-in architectures
+var Architect = {
 
-    if (obj === undefined) {
-        $ERROR("Object being tested is undefined.");
+  // Multilayer Perceptron
+  Perceptron: function Perceptron() {
+
+    var args = Array.prototype.slice.call(arguments); // convert arguments to Array
+    if (args.length < 3)
+      throw new Error("not enough layers (minimum 3) !!");
+
+    var inputs = args.shift(); // first argument
+    var outputs = args.pop(); // last argument
+    var layers = args; // all the arguments in the middle
+
+    var input = new Layer(inputs);
+    var hidden = [];
+    var output = new Layer(outputs);
+
+    var previous = input;
+
+    // generate hidden layers
+    for (level in layers) {
+      var size = layers[level];
+      var layer = new Layer(size);
+      hidden.push(layer);
+      previous.project(layer);
+      previous = layer;
     }
+    previous.project(output);
 
-    var objString = Object.prototype.toString.call(obj);
-    if (isFunction) {
-        if (objString !== "[object Function]") {
-            $ERROR("The [[Class]] internal property of a built-in function must be " +
-                    "\"Function\", but toString() returns " + objString);
-        }
-    } else {
-        if (objString !== "[object Object]") {
-            $ERROR("The [[Class]] internal property of a built-in non-function object must be " +
-                    "\"Object\", but toString() returns " + objString);
-        }
-    }
-
-    if (!Object.isExtensible(obj)) {
-        $ERROR("Built-in objects must be extensible.");
-    }
-
-    if (isFunction && Object.getPrototypeOf(obj) !== Function.prototype) {
-        $ERROR("Built-in functions must have Function.prototype as their prototype.");
-    }
-
-    if (isConstructor && Object.getPrototypeOf(obj.prototype) !== Object.prototype) {
-        $ERROR("Built-in prototype objects must have Object.prototype as their prototype.");
-    }
-
-    // verification of the absence of the [[Construct]] internal property has
-    // been moved to the end of the test
-    
-    // verification of the absence of the prototype property has
-    // been moved to the end of the test
-
-    if (isFunction) {
-        
-        if (typeof obj.length !== "number" || obj.length !== Math.floor(obj.length)) {
-            $ERROR("Built-in functions must have a length property with an integer value.");
-        }
-    
-        if (obj.length !== length) {
-            $ERROR("Function's length property doesn't have specified value; expected " +
-                length + ", got " + obj.length + ".");
-        }
-
-        var desc = Object.getOwnPropertyDescriptor(obj, "length");
-        if (desc.writable) {
-            $ERROR("The length property of a built-in function must not be writable.");
-        }
-        if (desc.enumerable) {
-            $ERROR("The length property of a built-in function must not be enumerable.");
-        }
-        if (!desc.configurable) {
-            $ERROR("The length property of a built-in function must be configurable.");
-        }
-    }
-
-    properties.forEach(function(prop) {
-        var desc = Object.getOwnPropertyDescriptor(obj, prop);
-        if (desc === undefined) {
-            $ERROR("Missing property " + prop + ".");
-        }
-        // accessor properties don't have writable attribute
-        if (desc.hasOwnProperty("writable") && !desc.writable) {
-            $ERROR("The " + prop + " property of this built-in object must be writable.");
-        }
-        if (desc.enumerable) {
-            $ERROR("The " + prop + " property of this built-in object must not be enumerable.");
-        }
-        if (!desc.configurable) {
-            $ERROR("The " + prop + " property of this built-in object must be configurable.");
-        }
+    // set layers of the neural network
+    this.set({
+      input: input,
+      hidden: hidden,
+      output: output
     });
 
-    // The remaining sections have been moved to the end of the test because
-    // unbound non-constructor functions written in JavaScript cannot possibly
-    // pass them, and we still want to test JavaScript implementations as much
-    // as possible.
-    
-    var exception;
-    if (isFunction && !isConstructor) {
-        // this is not a complete test for the presence of [[Construct]]:
-        // if it's absent, the exception must be thrown, but it may also
-        // be thrown if it's present and just has preconditions related to
-        // arguments or the this value that this statement doesn't meet.
-        try {
-            /*jshint newcap:false*/
-            var instance = new obj();
-        } catch (e) {
-            exception = e;
-        }
-        if (exception === undefined || exception.name !== "TypeError") {
-            $ERROR("Built-in functions that aren't constructors must throw TypeError when " +
-                "used in a \"new\" statement.");
-        }
+    // trainer for the network
+    this.trainer = new Trainer(this);
+  },
+
+  // Multilayer Long Short-Term Memory
+  LSTM: function LSTM() {
+
+    var args = Array.prototype.slice.call(arguments); // convert arguments to array
+    if (args.length < 3)
+      throw new Error("not enough layers (minimum 3) !!");
+
+    var last = args.pop();
+    var option = {
+      peepholes: Layer.connectionType.ALL_TO_ALL,
+      hiddenToHidden: false,
+      outputToHidden: false,
+      outputToGates: false,
+      inputToOutput: true,
+    };
+    if (typeof last != 'number') {
+      var outputs = args.pop();
+      if (last.hasOwnProperty('peepholes'))
+        option.peepholes = last.peepholes;
+      if (last.hasOwnProperty('hiddenToHidden'))
+        option.hiddenToHidden = last.hiddenToHidden;
+      if (last.hasOwnProperty('outputToHidden'))
+        option.outputToHidden = last.outputToHidden;
+      if (last.hasOwnProperty('outputToGates'))
+        option.outputToGates = last.outputToGates;
+      if (last.hasOwnProperty('inputToOutput'))
+        option.inputToOutput = last.inputToOutput;
+    } else
+      var outputs = last;
+
+    var inputs = args.shift();
+    var layers = args;
+
+    var inputLayer = new Layer(inputs);
+    var hiddenLayers = [];
+    var outputLayer = new Layer(outputs);
+
+    var previous = null;
+
+    // generate layers
+    for (var layer in layers) {
+      // generate memory blocks (memory cell and respective gates)
+      var size = layers[layer];
+
+      var inputGate = new Layer(size).set({
+        bias: 1
+      });
+      var forgetGate = new Layer(size).set({
+        bias: 1
+      });
+      var memoryCell = new Layer(size);
+      var outputGate = new Layer(size).set({
+        bias: 1
+      });
+
+      hiddenLayers.push(inputGate);
+      hiddenLayers.push(forgetGate);
+      hiddenLayers.push(memoryCell);
+      hiddenLayers.push(outputGate);
+
+      // connections from input layer
+      var input = inputLayer.project(memoryCell);
+      inputLayer.project(inputGate);
+      inputLayer.project(forgetGate);
+      inputLayer.project(outputGate);
+
+      // connections from previous memory-block layer to this one
+      if (previous != null) {
+        var cell = previous.project(memoryCell);
+        previous.project(inputGate);
+        previous.project(forgetGate);
+        previous.project(outputGate);
+      }
+
+      // connections from memory cell
+      var output = memoryCell.project(outputLayer);
+
+      // self-connection
+      var self = memoryCell.project(memoryCell);
+
+      // hidden to hidden recurrent connection
+      if (option.hiddenToHidden)
+        memoryCell.project(memoryCell, Layer.connectionType.ALL_TO_ELSE);
+
+      // out to hidden recurrent connection
+      if (option.outputToHidden)
+        outputLayer.project(memoryCell);
+
+      // out to gates recurrent connection
+      if (option.outputToGates) {
+        outputLayer.project(inputGate);
+        outputLayer.project(outputGate);
+        outputLayer.project(forgetGate);
+      }
+
+      // peepholes
+      memoryCell.project(inputGate, option.peepholes);
+      memoryCell.project(forgetGate, option.peepholes);
+      memoryCell.project(outputGate, option.peepholes);
+
+      // gates
+      inputGate.gate(input, Layer.gateType.INPUT);
+      forgetGate.gate(self, Layer.gateType.ONE_TO_ONE);
+      outputGate.gate(output, Layer.gateType.OUTPUT);
+      if (previous != null)
+        inputGate.gate(cell, Layer.gateType.INPUT);
+
+      previous = memoryCell;
     }
 
-    if (isFunction && !isConstructor && obj.hasOwnProperty("prototype")) {
-        $ERROR("Built-in functions that aren't constructors must not have a prototype property.");
+    // input to output direct connection
+    if (option.inputToOutput)
+      inputLayer.project(outputLayer);
+
+    // set the layers of the neural network
+    this.set({
+      input: inputLayer,
+      hidden: hiddenLayers,
+      output: outputLayer
+    });
+
+    // trainer
+    this.trainer = new Trainer(this);
+  },
+
+  // Liquid State Machine
+  Liquid: function Liquid(inputs, hidden, outputs, connections, gates) {
+
+    // create layers
+    var inputLayer = new Layer(inputs);
+    var hiddenLayer = new Layer(hidden);
+    var outputLayer = new Layer(outputs);
+
+    // make connections and gates randomly among the neurons
+    var neurons = hiddenLayer.neurons();
+    var connectionList = [];
+
+    for (var i = 0; i < connections; i++) {
+      // connect two random neurons
+      var from = Math.random() * neurons.length | 0;
+      var to = Math.random() * neurons.length | 0;
+      var connection = neurons[from].project(neurons[to]);
+      connectionList.push(connection);
     }
 
-    // passed the complete test!
-    return true;
+    for (var j = 0; j < gates; j++) {
+      // pick a random gater neuron
+      var gater = Math.random() * neurons.length | 0;
+      // pick a random connection to gate
+      var connection = Math.random() * connectionList.length | 0;
+      // let the gater gate the connection
+      neurons[gater].gate(connectionList[connection]);
+    }
+
+    // connect the layers
+    inputLayer.project(hiddenLayer);
+    hiddenLayer.project(outputLayer);
+
+    // set the layers of the network
+    this.set({
+      input: inputLayer,
+      hidden: [hiddenLayer],
+      output: outputLayer
+    });
+
+    // trainer
+    this.trainer = new Trainer(this);
+  },
+
+  Hopfield: function Hopfield(size)
+  {
+    var inputLayer = new Layer(size);
+    var outputLayer = new Layer(size);
+
+    inputLayer.project(outputLayer, Layer.connectionType.ALL_TO_ALL);
+
+    this.set({
+      input: inputLayer,
+      hidden: [],
+      output: outputLayer
+    });
+
+    var trainer = new Trainer(this);
+
+    var proto = Architect.Hopfield.prototype;
+
+    proto.learn = proto.learn || function(patterns)
+    {
+      var set = [];
+      for (var p in patterns)
+        set.push({
+          input: patterns[p],
+          output: patterns[p]
+        });
+
+      return trainer.train(set, {
+        iterations: 500000,
+        error: .00005,
+        rate: 1
+      });
+    }
+
+    proto.feed = proto.feed || function(pattern)
+    {
+      var output = this.activate(pattern);
+
+      var pattern = [];
+      for (var i in output)
+        pattern[i] = output[i] > .5 ? 1 : 0;
+
+      return pattern;
+    }
+  }
 }
 
+// Extend prototype chain (so every architectures is an instance of Network)
+for (var architecture in Architect) {
+  Architect[architecture].prototype = new Network();
+  Architect[architecture].prototype.constructor = Architect[architecture];
+}
+
+// export
+if (module) module.exports = Architect;

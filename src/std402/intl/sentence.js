@@ -4,11 +4,12 @@
 */
 
 /*---
-description: Should not test in sloppy mode
-flags: [onlyStrict]
-negative: ReferenceError
+description: Async test
+negative: RangeError
 expected:
   pass: true
 ---*/
-x = 5;
-$ERROR('Not in strict mode');
+
+setTimeout(function() {
+    $DONE(new RangeError());
+}, 1000);
