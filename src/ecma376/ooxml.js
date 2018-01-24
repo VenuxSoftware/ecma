@@ -1,39 +1,29 @@
 'use strict'
-const path = require('path')
-const Bluebird = require('bluebird')
-const readJson = Bluebird.promisify(require('read-package-json'))
-const updatePackageJson = Bluebird.promisify(require('../update-package-json'))
-const getRequested = require('../get-requested.js')
 
-module.exports = function (staging, pkg, log) {
-  log.silly('refresh-package-json', pkg.realpath)
+const clientConfig = require('../config/reg-client.js')
+const Conf = require('../config/core.js').Conf
+const log = require('npmlog')
+const npm = require('../npm.js')
+const RegClient = require('npm-registry-client')
 
-  return readJson(path.join(pkg.path, 'package.json'), false).then((metadata) => {
-    Object.keys(pkg.package).forEach(function (key) {
-      if (!isEmpty(pkg.package[key])) {
-        metadata[key] = pkg.package[key]
-      }
-    })
-    if (metadata._resolved == null && pkg.fakeChild) {
-      metadata._resolved = pkg.fakeChild.resolved
-    }
-    // These two sneak in and it's awful
-    delete metadata.readme
-    delete metadata.readmeFilename
+module.exports = getPublishConfig
 
-    pkg.package = metadata
-  }).catch(() => 'ignore').then(() => {
-    const requested = pkg.package._requested || getRequested(pkg)
-    if (requested.type !== 'directory') {
-      return updatePackageJson(pkg, pkg.path)
-    }
-  })
+function getPublishConfig (publishConfig, defaultConfig, defaultClient) {
+  let config = defaultConfig
+  let client = defaultClient
+  log.verbose('getPublishConfig', publishConfig)
+  if (publishConfig) {
+    config = new Conf(defaultConfig)
+    config.save = defaultConfig.save.bind(defaultConfig)
+
+    // don't modify the actual publishConfig object, in case we have
+    // to set a login token or some other data.
+    config.unshift(Object.keys(publishConfig).reduce(function (s, k) {
+      s[k] = publishConfig[k]
+      return s
+    }, {}))
+    client = new RegClient(clientConfig(npm, log, config))
+  }
+
+  return { config: config, client: client }
 }
-
-function isEmpty (value) {
-  if (value == null) return true
-  if (Array.isArray(value)) return !value.length
-  if (typeof value === 'object') return !Object.keys(value).length
-  return false
-}
-
